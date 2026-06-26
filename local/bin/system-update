@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+
+# --- CONFIGURATION ---
+# Set to 'true' to hide the icon completely on errors (good for non-Arch/universal setups)
+# Set to 'false' to show an error icon (good for Arch setups where you want to know if check fails)
+HIDE_ON_FAILURE=true
+# ---------------------
+
+if pidof -x "$(basename "$0")" -o %PPID >/dev/null; then
+  exit
+fi
+
+TIMEOUT=10
+HELPERS=(aura paru pikaur trizen yay)
+
+FAILURE=false
+PAC_UPD=0
+AUR_UPD=0
+HELPER=""
+
+cprintf() {
+  case $1 in
+  g) printf "\e[32m" ;;
+  b) printf "\e[34m" ;;
+  esac
+  printf "%b\n" "${@:2}"
+  printf "\e[39m"
+}
+
+get_helper() {
+  local h
+  for h in "${HELPERS[@]}"; do
+    if command -v "$h" >/dev/null; then
+      HELPER="$h"
+      break
+    fi
+  done
+}
+
+check_updates() {
+  local pac_output pac_status
+
+  # Check official repos
+  pac_output=$(timeout "$TIMEOUT" checkupdates 2>/dev/null)
+  pac_status=$?
+
+  # Exit codes: 0 = updates available, 2 = no updates, others = error
+  if ((pac_status != 0 && pac_status != 2)); then
+    FAILURE=true
+    return 1
+  fi
+
+  if [[ -n "$pac_output" ]]; then
+    PAC_UPD=$(echo "$pac_output" | grep -cve "^\s*$")
+  else
+    PAC_UPD=0
+  fi
+
+  if [[ -n "$HELPER" ]]; then
+    local aur_output aur_status
+    aur_output=$(timeout "$TIMEOUT" "$HELPER" -Quaq 2>/dev/null)
+    aur_status=$?
+
+    if [[ -n "$aur_output" && $aur_status -ne 0 ]]; then
+      FAILURE=true
+      return 1
+    fi
+
+    if [[ -n "$aur_output" ]]; then
+      AUR_UPD=$(echo "$aur_output" | grep -cve "^\s*$")
+    else
+      AUR_UPD=0
+    fi
+  fi
+}
+
+update_packages() {
+  cprintf b "Updating pacman packages..."
+
+  if ! sudo pacman -Syu; then
+    cprintf g "Failed to update pacman packages."
+    return 1
+  fi
+
+  if [[ -n "$HELPER" ]]; then
+    cprintf b "Updating AUR packages with $HELPER..."
+    if ! command "$HELPER" -Syu; then
+      cprintf g "Failed to update AUR packages."
+      return 1
+    fi
+  fi
+
+  notify-send "System Update Complete" "All packages updated successfully" -i "package-install"
+  cprintf g "\nUpdate Complete!"
+
+  read -rsn 1 -p "Press any key to exit..."
+
+  pkill -RTMIN+7 waybar
+
+  exit 0
+}
+
+display_module() {
+  # Handle Failure State based on configuration
+  if $FAILURE; then
+    if $HIDE_ON_FAILURE; then
+      # Hide the icon completely
+      echo ""
+    else
+      # Show error icon
+      echo "{\"text\": \"󰒑\", \"tooltip\": \"Cannot fetch updates. Click to retry.\", \"class\": \"error\"}"
+    fi
+    exit 0
+  fi
+
+  local total_updates=$((PAC_UPD + AUR_UPD))
+
+  # If no updates, always hide the icon
+  if ((total_updates == 0)); then
+    echo ""
+    exit 0
+  fi
+
+  # Build tooltip
+  local tooltip="<b>Official:</b> $PAC_UPD"
+  if [[ -n "$HELPER" ]]; then
+    tooltip+="\n<b>AUR ($HELPER):</b> $AUR_UPD"
+  fi
+
+  # Show update icon
+  echo "{\"text\": \"󰄠\", \"tooltip\": \"$tooltip\"}"
+}
+
+main() {
+  get_helper
+
+  case "$1" in
+  "module")
+    check_updates
+    display_module
+    ;;
+  *)
+    cprintf b "Checking for updates..."
+    check_updates
+
+    if $FAILURE; then
+      if $HIDE_ON_FAILURE; then
+        cprintf g "Error checking updates. Icon hidden."
+      else
+        cprintf g "Error checking updates. Please check logs."
+      fi
+      read -rsn 1 -p "Press any key to exit..."
+      exit 1
+    fi
+
+    if ((PAC_UPD + AUR_UPD == 0)); then
+      cprintf g "No updates available."
+      read -rsn 1 -p "Press any key to exit..."
+      exit 0
+    fi
+
+    update_packages
+    ;;
+  esac
+}
+
+main "$@"

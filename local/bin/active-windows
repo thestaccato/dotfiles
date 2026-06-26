@@ -1,0 +1,12 @@
+#!/bin/bash
+
+window_list=$(hyprctl clients -j | jq -r '.[] | "\(.title) [\(.class)]"')
+
+choice=$(echo "$window_list" | fuzzel -d)
+
+if [ -n "$choice" ]; then
+  
+  addr=$(hyprctl clients -j | jq -r ".[] | select(\"\(.title) [\(.class)]\" == \"$choice\") | .address" | head -n 1)
+
+  hyprctl dispatch focuswindow address:"$addr"
+fi
