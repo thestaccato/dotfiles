@@ -1,7 +1,7 @@
 font=Inter 12
-background-color=#090e13
-text-color=#c5c9c7
-border-color=#717c7c
+background-color=#1d2021
+text-color=#d4be98
+border-color=#3c3836
 border-size=2
 border-radius=8
 padding=10
@@ -21,11 +21,11 @@ default-timeout=5000
 group-by=app-name
 
 [urgency=low]
-background-color=#090e13
-text-color=#c5c9c7
+background-color=#1d2021
+text-color=#d4be98
 
 [urgency=high]
-background-color=#090e13
-text-color=#c34043
-border-color=#c34043
+background-color=#1d2021
+text-color=#ea6962
+border-color=#ea6962
 default-timeout=0

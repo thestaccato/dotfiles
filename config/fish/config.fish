@@ -81,6 +81,7 @@ function extract
     end
 end
 
+set -g fish_color_autosuggestion 504945
 #alias sudo doas
 set -gx PATH $HOME/.local/bin $PATH
 starship init fish | source
