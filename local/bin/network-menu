@@ -77,7 +77,7 @@ select_network() {
     "--info=inline-right"
     "--pointer="
     "--reverse"
-    "--color=bg+:#C5C9C7,fg+:#090e13,bg:#090e13,fg:#C5C9C7"
+    "--color=bg+:#d4be98,fg+:#1d2021,bg:#1d2021,fg:#d4be98"
   )
 
   BSSID=$(fzf "${options[@]}" <<<"$NETWORKS" | awk '{print $1}')
